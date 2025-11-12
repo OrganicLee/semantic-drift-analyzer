@@ -34,39 +34,27 @@ def load_screaming_frog(file):
     return df
 
 def load_gsc(path):
-    df = pd.read_csv(path)
+    import chardet
 
-    # --- Normalise column headers ---
-    df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
+    # --- Detect encoding (Google CSVs often come with BOM) ---
+    with open(path, "rb") as f:
+        raw = f.read(2048)
+    enc = chardet.detect(raw)["encoding"] or "utf-8"
 
-    # --- Gracefully handle alternate GSC column names ---
-    rename_map = {
-        "top_pages": "page",
-        "pages": "page",
-        "page_url": "page"
-    }
-    df.rename(columns={k: v for k, v in rename_map.items() if k in df.columns}, inplace=True)
+    df = pd.read_csv(path, encoding=enc)
 
-    # --- Ensure 'page' column exists ---
-    if "page" not in df.columns:
-        raise ValueError("GSC file must contain a 'Page' or 'Top Pages' column.")
+    # --- Normalise column headers (strip, lower, remove BOMs) ---
+    df.columns = [col.strip().replace("\ufeff", "").lower() for col in df.columns]
 
-    # --- Normalise URLs ---
-    df["page"] = df["page"].apply(normalise_url)
+    # --- Try to identify the correct page column dynamically ---
+    possible_cols = [c for c in df.columns if "page" in c]
+    if not possible_cols:
+        raise KeyError(
+            f"No 'Page' or 'Top Pages' column found. Columns detected: {list(df.columns)}"
+        )
 
+    page_col = possible_cols[0]
+    df.rename(columns={page_col: "Page"}, inplace=True)
+
+    df["Page"] = df["Page"].apply(normalise_url)
     return df
-
-def merge_data(sf_df, gsc_df):
-    df = sf_df.merge(gsc_df, left_on='Address', right_on='Page', how='left')
-    df['Clicks'] = df['Clicks'].fillna(0)
-    df['CTR'] = df['CTR'].fillna(0)
-    df['Impressions'] = df['Impressions'].fillna(0)
-    return df
-
-def parse_embedding(value):
-    try:
-        if isinstance(value, str):
-            return np.array(ast.literal_eval(value))
-    except Exception:
-        return np.nan
-    return np.nan
