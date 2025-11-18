@@ -59,8 +59,8 @@ utils/
 ### 1. Clone the repo
 
 ```
-git clone https://github.com/<your-username>/topical-centre-visualiser.git
-cd topical-centre-visualiser
+git clone https://github.com/lukegravity/semantic-drift-analyzer.git
+cd semantic-drift-analyzer
 
 ```
 
